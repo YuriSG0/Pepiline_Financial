@@ -89,7 +89,7 @@ def dag_financial():
         def loading_data_exchange(data_exchange:dict,code:str):
             data = data_exchange[code]
             df = pd.DataFrame([data])
-            df['create_date'] = pd.to_datetime(df['create_date'],format='%d/%m/&Y').dt.strftime('%Y-%m-%d')
+            #df['create_date'] = pd.to_datetime(df['create_date'],format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
             df = df[['code','codein','name','high','low','varBid','ask','create_date']]
 
