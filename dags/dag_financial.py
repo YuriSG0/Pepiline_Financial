@@ -30,7 +30,7 @@ def dag_financial():
     with TaskGroup('Requests-for-Exchange-Rate-Data') as extract_exchange:
         @task(trigger_rule= TriggerRule.ALL_DONE)
         def requests_exchange_rate(currency_pair:str):
-            url_connection = BaseHook.get_connection('exchange-rate')
+            url_connection = BaseHook.get_connection('exchange-rate').host
             url_requests = f'{url_connection}/{currency_pair}'
             response = requests.get(url_requests)
 
@@ -49,7 +49,7 @@ def dag_financial():
         @task(trigger_rule=TriggerRule.ALL_DONE)
         def requests_index_inflation(financial_indicator:str,quantity_data=20):
 
-            url_connection = BaseHook.get_connection("financial-ratio-index")
+            url_connection = BaseHook.get_connection("financial-ratio-index").host
             url_requests = f'{url_connection}{financial_indicator}/dados/ultimos/{quantity_data}'
             response = requests.get(url_requests)
 
@@ -59,43 +59,27 @@ def dag_financial():
         selic = requests_index_inflation.override(task_id = 'get_selic_data')(11)
         selic_goal = requests_index_inflation.override(task_id = 'get_selic_goal_data')(432)
 
-    with TaskGroup('Load-Exchange-Rate-Data') as load_exchange:    
-        
+    with TaskGroup('Loading-for-Tables-Snowflake') as loading_data_financial:
+
         @task
-        def loading_exchange_rate(data: Dict[str,Any]):
+        def loading_data_index_inflation(data_index_inflation:dict,indicator:str):
 
-            df = pd.DataFrame.from_dict(data,orient='index')
-            df = df.reset_index().rename(columns={'index':'par_moeda'})
-            sorted_columns = [
-                'par_moeda',
-                'code',       
-                'high',
-                'low',
-                'varBid',
-                'pctChange',
-                'bid',
-                'ask',
-                'create_date'
-            ]
-            df_sorted = df[sorted_columns]
-            df_values = df_sorted.values.tolist()
+            df = pd.DataFrame(data_index_inflation)
+            df['indicador'] = indicator
+            df = df[['data','valor','indicador']]
 
-            hook = SnowflakeHook(snowflake_conn_id = 'snowflake-financial')
+            values = df.values.tolist()
 
-            query = """
-                INSERT INTO PUBLIC.Exange_Rate_Temp (
-                par_moeda, codigo_origem, valor_maximo, valor_minimo, 
-                variacao, porcentagem_mudanca, preco_compra, preco_venda, 
-                data_consulta_transacao
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """
+            hook = SnowflakeHook(snowflake_conn_id ='snowflake-financial')
 
-            hook.run(query,parameters=df_values)
+            hook.insert_rows(
+                table = 'Financial_Indicator_Temp',
+                rows = values,
+                target_fields=['date_visit','value_indicator','indicator']
+            )
 
-        loading_exchange_rate.override(task_id='loading_exchange_rate_usd_brl')(usd_brl)
-        loading_exchange_rate.override(task_id='loading_exchange_rate_eur_brl')(eur_brl)
+        load_ipca_data = loading_data_index_inflation.override(task_id='load_ipca_data')(ipca,'IPCA')
         
-
 dag_financial()
 
 
