@@ -1,0 +1,25 @@
+# Ambientes virtuais e dependências locais
+.venv/
+venv/
+ENV/
+
+# Configurações e metadados de IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs e arquivos de execução temporários do Airflow
+logs/
+__pycache__/
+*.pyc
+*.pyv
+
+# Controle de versão e arquivos do Docker
+.git/
+.gitignore
+Dockerfile
+docker-compose.yaml
+
+# Documentos e rascunhos locais de análise
+analytics/

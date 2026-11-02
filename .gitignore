@@ -1,0 +1,17 @@
+# Ambiente Virtual
+.venv/
+
+# Configs Visual Studio Code
+.vscode/
+
+# Logs da Aplicacao
+logs/
+
+# Pluguins Airflow
+pluguins/
+
+#Docker-Compose do airflow
+docker-compose.yaml
+
+# Analystics Folder
+analystics/
