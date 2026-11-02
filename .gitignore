@@ -3,6 +3,9 @@
 
 # Configs Visual Studio Code
 .vscode/
+.idea/
+*.swp
+*.swo
 
 # Logs da Aplicacao
 logs/
@@ -14,4 +17,4 @@ pluguins/
 docker-compose.yaml
 
 # Analystics Folder
-analystics/
+analytics/
