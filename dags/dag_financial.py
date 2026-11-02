@@ -59,13 +59,14 @@ def dag_financial():
         selic = requests_index_inflation.override(task_id = 'get_selic_data')(11)
         selic_goal = requests_index_inflation.override(task_id = 'get_selic_goal_data')(432)
 
-    with TaskGroup('Loading-for-Tables-Snowflake') as loading_data_financial:
+    with TaskGroup('Loading-for-Tables-Snowflake-Index-Inflation') as loading_data_index:
 
         @task
         def loading_data_index_inflation(data_index_inflation:dict,indicator:str):
 
             df = pd.DataFrame(data_index_inflation)
             df['indicador'] = indicator
+            df['data'] = pd.to_datetime(df['data'],format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
             df = df[['data','valor','indicador']]
 
             values = df.values.tolist()
@@ -79,17 +80,57 @@ def dag_financial():
             )
 
         load_ipca_data = loading_data_index_inflation.override(task_id='load_ipca_data')(ipca,'IPCA')
+        load_selic_data = loading_data_index_inflation.override(task_id='load_selic_data')(selic,'SELIC')
+        load_selic_goal_data = loading_data_index_inflation.override(task_id='load_selic_goal_data')(selic_goal,'SELIC-GOAL')
+
+    with TaskGroup('Loading-for-Tables-Snowflake-Exchange') as loading_data_exchange_rate:
+
+        @task
+        def loading_data_exchange(data_exchange:dict,code:str):
+            data = data_exchange[code]
+            df = pd.DataFrame([data])
+            df['create_date'] = pd.to_datetime(df['create_date'],format='%d/%m/&Y').dt.strftime('%Y-%m-%d')
+
+            df = df[['code','codein','name','high','low','varBid','ask','create_date']]
+
+            values = df.values.tolist()
+
+            hook = SnowflakeHook(snowflake_conn_id='snowflake-financial')
+
+            hook.insert_rows(
+                table= 'exange_rate_temp',
+                rows = values,
+                target_fields = ['Code', 'CodeIn', 'Name', 'High', 'Low', 'Bid', 'Ask', 'create_date']
+            )
+
+        load_exchange_usd = loading_data_exchange.override(task_id='load_exchange_usd_data')(usd_brl,'USDBRL')
+        load_exchange_eur = loading_data_exchange.override(task_id='load_exchange_eur_Data')(eur_brl,'EURBRL')
+
+
+    with TaskGroup('Financial-Merge-Procedure-Call') as call_procedure:
+
+        @task
+        def call_procedure_ratio_index():
+
+            hook = SnowflakeHook(snowflake_conn_id='snowflake-financial')
+
+            call = hook.get_first('Call sp_process_indicator()')
+
+            return call
+        
+        exec_procedure_index_ratio = call_procedure_ratio_index.override(task_id='call_procedure_merge_ratio_index')()
+
+        @task
+        def call_procedure_exchange():
+            hook = SnowflakeHook(snowflake_conn_id='snowflake-financial')
+
+            call = hook.get_first('Call sp_process_exchange()')
+
+            return call
+
+        exec_procedure_exchange = call_procedure_exchange.override(task_id='call_procedure_merge_exchange')()
+
+    extract_exchange >> loading_data_exchange_rate >> call_procedure
+    extract_ratios_index >> loading_data_index >> call_procedure
         
 dag_financial()
-
-
-
-
-
-
-
-
-        
-        
-
-        
